@@ -850,7 +850,18 @@ class Request extends EventEmitter
 	@returns {Request}
 	###
 
-	query: (command, callback) ->
+	###
+	Edit by shoaibmerchant
+	Note: added third parameter as options which is optional. So it will not break exisitng code
+	###
+
+	query: (command, callback, options) ->
+	
+	###
+	End of Edit
+	Original Code: query: (command, callback) ->
+	###
+
 		unless @connection
 			return process.nextTick ->
 				callback? new RequestError "No connection is specified for that request.", 'ENOCONN'
@@ -861,7 +872,14 @@ class Request extends EventEmitter
 			unless err then @emit 'done', err, recordset
 			
 			callback? err, recordset
-			
+		###
+		Edit by shoaibmerchant
+		Note: added options parameter to the driver request too (tedious)
+		###
+		, options
+		###
+		End of Edit
+		###
 		@
 	
 	###

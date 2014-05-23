@@ -248,11 +248,24 @@ module.exports = (Connection, Transaction, Request, ConnectionError, Transaction
 		Execute specified sql command.
 		###
 
-		query: (command, callback) ->
+		query: (command, callback, options) ->
 			columns = {}
 			recordset = []
 			recordsets = []
 			started = Date.now()
+
+
+			###
+			Edit by shoaibmerchant
+			Note: If options is not specified use default and If options.mode is set to stream, 
+			initialize recordset as Number
+			###
+
+			options = mode: "normal"  if options is `undefined`
+			recordset = 0  if options.mode is "stream"
+			console.log "---------- query mode ----------\n    mode: " + options.mode  if @verbose
+
+			# End of Additional Code 
 
 			@_acquire (err, connection) =>
 				unless err
@@ -289,12 +302,40 @@ module.exports = (Connection, Transaction, Request, ConnectionError, Transaction
 					req.on 'columnMetadata', (metadata) =>
 						for col in metadata
 							columns[col.colName] = col
+						###
+						Edit by shoaibmerchant
+                		Note: allowing the user to subscribe to meta also
+						###
+
+						@emit "meta", _results
+
+						# End of Additional Code
 					
 					req.on 'doneInProc', (rowCount, more, rows) =>
 						# this function is called even when select only set variables so we should skip adding a new recordset
 						if Object.keys(columns).length is 0 then return
 						
 						# all rows of current recordset loaded
+
+						###
+						Edit by shoaibmerchant
+                		Note: allowing the user to subscribe to meta also
+						###
+
+						if options.mode is "normal"
+							Object.defineProperty recordset, "columns",
+							enumerable: false
+							value: createColumns(columns)
+
+							Object.defineProperty recordset, "toTable",
+							enumerable: false
+							value: ->
+							  Table.fromRecordset @
+
+						###
+						End of Edit
+
+						Original Code: 
 						Object.defineProperty recordset, 'columns', 
 							enumerable: false
 							value: createColumns(columns)
@@ -302,7 +343,8 @@ module.exports = (Connection, Transaction, Request, ConnectionError, Transaction
 						Object.defineProperty recordset, 'toTable', 
 							enumerable: false
 							value: -> Table.fromRecordset @
-						
+						###
+
 						@emit 'recordset', recordset
 						
 						recordsets.push recordset
@@ -319,9 +361,23 @@ module.exports = (Connection, Transaction, Request, ConnectionError, Transaction
 						@parameters[parameterName].value = if value is tds.TYPES.Null then null else value
 					
 					req.on 'row', (columns) =>
+						###
+						Edit by shoaibmerchant
+                		Note: Only for normal mode
+                		###
+
+            			if not recordset and options.mode is "normal"
+							recordset = []
+						else recordset = 0  if not recordset and options.mode is "stream"
+
+						###
+						End of Edit
+
+		                Original Code  
 						unless recordset
 							recordset = []
-							
+						###
+
 						row = {}
 						for col in columns
 							col.value = valueCorrection col.value, col.metadata
@@ -343,7 +399,20 @@ module.exports = (Connection, Transaction, Request, ConnectionError, Transaction
 						
 						@emit 'row', row
 						
-						recordset.push row
+						###
+						Edit by shoaibmerchant
+                		Note: For normal mode push row to recordset and for stream increment
+						###
+						if options.mode is "stream"
+							++recordset
+						else
+							recordset.push row
+						###
+						End of Edit
+
+		                Original Code  
+		                recordset.push row
+						###
 					
 					for name, param of @parameters when param.io is 1
 						if @verbose
